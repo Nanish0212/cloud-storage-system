@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Storage - Secure File Management</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-cloud"></i>
+                    <h1>CloudVault</h1>
+                </div>
+                <p class="subtitle">Secure File Storage & Management</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section">
+                <div class="upload-card">
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h2>Drag & Drop Your Files</h2>
+                        <p>or click to select files to upload</p>
+                        <input type="file" id="fileInput" multiple hidden />
+                    </div>
+                    <form id="uploadForm" style="display: none;">
+                        <input type="file" name="file" required />
+                    </form>
+                </div>
+                <div class="upload-stats">
+                    <div class="stat">
+                        <i class="fas fa-folder"></i>
+                        <span id="fileCount">0</span>
+                        <p>Files</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Files Section -->
+            <section class="files-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-folder-open"></i> Your Files</h2>
+                    <div class="view-toggle">
+                        <button class="view-btn active" data-view="grid" title="Grid View">
+                            <i class="fas fa-grip"></i>
+                        </button>
+                        <button class="view-btn" data-view="list" title="List View">
+                            <i class="fas fa-list"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="emptyState" class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <h3>No files yet</h3>
+                    <p>Start by uploading your first file</p>
+                </div>
+
+                <div id="fileList" class="file-grid"></div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.getElementById('uploadArea');
+        const fileList = document.getElementById('fileList');
+        const emptyState = document.getElementById('emptyState');
+        const fileCount = document.getElementById('fileCount');
+        const viewToggleBtns = document.querySelectorAll('.view-btn');
+        let currentView = 'grid';
+
+        // Drag and drop
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        // Handle file upload
+        async function handleFiles(files) {
+            for (let file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+                try {
+                    await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                } catch (err) {
+                    console.error('Upload failed:', err);
+                }
+            }
+            fileInput.value = '';
+            loadFiles();
+        }
+
+        // Load files
+        async function loadFiles() {
+            try {
+                const res = await fetch('/files');
+                const files = await res.json();
+                fileCount.textContent = files.length;
+
+                fileList.innerHTML = '';
+                if (files.length === 0) {
+                    emptyState.style.display = 'flex';
+                } else {
+                    emptyState.style.display = 'none';
+                    files.forEach(file => {
+                        const fileCard = createFileCard(file);
+                        fileList.appendChild(fileCard);
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to load files:', err);
+            }
+        }
+
+        // Create file card
+        function createFileCard(file) {
+            const ext = file.split('.').pop().toLowerCase();
+            const icon = getFileIcon(ext);
+            const card = document.createElement('div');
+            card.className = 'file-card';
+            card.innerHTML = `
+                <div class="file-icon">${icon}</div>
+                <div class="file-info">
+                    <h3 class="file-name">${escapeHtml(file)}</h3>
+                    <p class="file-ext">${ext.toUpperCase()}</p>
+                </div>
+                <div class="file-actions">
+                    <a href="/download/${encodeURIComponent(file)}" class="btn-action download" title="Download">
+                        <i class="fas fa-download"></i>
+                    </a>
+                    <button class="btn-action delete" onclick="deleteFile('${file}')" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            return card;
+        }
+
+        // Get file icon based on extension
+        function getFileIcon(ext) {
+            const icons = {
+                'pdf': '<i class="fas fa-file-pdf"></i>',
+                'doc': '<i class="fas fa-file-word"></i>',
+                'docx': '<i class="fas fa-file-word"></i>',
+                'xls': '<i class="fas fa-file-excel"></i>',
+                'xlsx': '<i class="fas fa-file-excel"></i>',
+                'ppt': '<i class="fas fa-file-powerpoint"></i>',
+                'pptx': '<i class="fas fa-file-powerpoint"></i>',
+                'txt': '<i class="fas fa-file-alt"></i>',
+                'jpg': '<i class="fas fa-file-image"></i>',
+                'jpeg': '<i class="fas fa-file-image"></i>',
+                'png': '<i class="fas fa-file-image"></i>',
+                'gif': '<i class="fas fa-file-image"></i>',
+                'mp4': '<i class="fas fa-file-video"></i>',
+                'mp3': '<i class="fas fa-file-audio"></i>',
+                'zip': '<i class="fas fa-file-archive"></i>',
+                'rar': '<i class="fas fa-file-archive"></i>',
+            };
+            return icons[ext] || '<i class="fas fa-file"></i>';
+        }
+
+        // Delete file
+        async function deleteFile(file) {
+            if (confirm(`Are you sure you want to delete "${file}"?`)) {
+                try {
+                    await fetch(`/delete/${encodeURIComponent(file)}`, { method: 'DELETE' });
+                    loadFiles();
+                } catch (err) {
+                    console.error('Delete failed:', err);
+                }
+            }
+        }
+
+        // View toggle
+        viewToggleBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                viewToggleBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentView = btn.dataset.view;
+                fileList.className = `file-${currentView}`;
+            });
+        });
+
+        // Utility function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initial load
+        loadFiles();
+    </script>
+</body>
+</html>
